@@ -16,7 +16,39 @@ This system transforms RS Bridge Consultancy from manual email tracking into a m
 
 ---
 
-## 2. The 4 Portals (Who Gets Access & What They Can Do)
+## 2. End-to-End Recruitment Workflow (Visual Flow)
+
+```mermaid
+flowchart TD
+    subgraph "Candidate Flow"
+        A1["Candidate visits /jobs"] --> A2["Register / Login"]
+        A2 --> A3["Upload Resume & Profile"]
+        A3 --> A4["Apply to Job Requirement"]
+        A4 --> A5["Receive Status Updates via Email/App"]
+    end
+
+    subgraph "Internal Staff Flow (Employee & Admin)"
+        B1["New Application Auto-Assigned"] --> B2["Screen & Review Resume"]
+        B2 --> B3["Move to Shortlisted Stage"]
+        B3 --> B4["Schedule Interview"]
+        B4 --> B5["Mark as Joined / Placed"]
+    end
+
+    subgraph "Company Client Flow (HR Contact)"
+        C1["Company Inquiry / Sign-up"] --> C2["Admin Approves HR Account"]
+        C2 --> C3["Post Job Requirement"]
+        C3 --> C4["Sign Digital Terms of Business"]
+        C4 --> C5["Review Candidates & Attend Interviews"]
+    end
+
+    A4 --> B1
+    B4 --> C5
+    B5 --> D["Auto-Generate Invoice Draft"]
+```
+
+---
+
+## 3. The 4 Portals (Who Gets Access & What They Can Do)
 
 | User Portal | Who Uses It | What They Can See & Do |
 |---|---|---|
@@ -27,7 +59,7 @@ This system transforms RS Bridge Consultancy from manual email tracking into a m
 
 ---
 
-## 3. Step-by-Step Business Workflow
+## 4. Step-by-Step Business Workflow
 
 ### **Step 1: Requirement Intake & Approval**
 1. Client HR posts a job vacancy on the portal.
@@ -48,6 +80,26 @@ This system transforms RS Bridge Consultancy from manual email tracking into a m
 2. **Security Gate:** If the client has not yet signed the RS Bridge Terms of Business, the portal prompts them to sign digitally (checking agreement box + typing full legal name).
 3. Once signed, candidate contact details are unlocked, and the interview date is set.
 
+```mermaid
+sequenceDiagram
+    autonumber
+    actor HR as Company HR Contact
+    participant App as RS Bridge Portal
+    participant DB as System Database
+    participant Admin as RS Bridge Founders
+
+    HR->>App: Clicks "Schedule Interview" for Shortlisted Candidate
+    App->>DB: Check if terms_agreement_signed == true
+    alt Terms NOT Signed
+        App-->>HR: Prompt: Digital Signature Required Before Reveal
+        HR->>App: Reviews T&C, checks box, types Full Legal Name
+        App->>DB: Save Timestamp, IP Address & Typed Name Snapshot
+        App-->>HR: Terms Accepted! Contact details revealed.
+    else Terms Signed
+        App-->>HR: Display Candidate Phone, Email & Raw Resume
+    end
+```
+
 ### **Step 5: Joining & Auto-Invoicing**
 1. Candidate successfully clears interviews and joins the company.
 2. Application status is updated to **Joined**.
@@ -55,7 +107,7 @@ This system transforms RS Bridge Consultancy from manual email tracking into a m
 
 ---
 
-## 4. How Candidate Privacy & Firm Commission Are Protected
+## 5. How Candidate Privacy & Firm Commission Are Protected
 
 | Feature | How It Works | Why It Protects Your Business |
 |---|---|---|
@@ -66,7 +118,7 @@ This system transforms RS Bridge Consultancy from manual email tracking into a m
 
 ---
 
-## 5. Commercial Terms & Guarantee Rules
+## 6. Commercial Terms & Guarantee Rules
 
 | Business Rule | Standard Policy | Platform Enforcement |
 |---|---|---|
@@ -77,7 +129,7 @@ This system transforms RS Bridge Consultancy from manual email tracking into a m
 
 ---
 
-## 6. Smooth Transition from Google Forms to the App
+## 7. Smooth Transition from Google Forms to the App
 
 While the application is being finalized:
 1. You can collect data right now using **Candidate & Company Google Forms**.
