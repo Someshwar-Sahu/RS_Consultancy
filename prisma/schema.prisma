@@ -1,0 +1,327 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+  COMPANY_CONTACT
+  CANDIDATE
+}
+
+enum ExperienceLevel {
+  Fresher
+  Intermediate
+  Expert
+}
+
+enum PreferredCategory {
+  IT
+  SalesMarketing @map("Sales&Marketing")
+  BPO
+  BackOffice
+  Permanent
+  Bulk
+  Driver
+  FieldStaff
+}
+
+enum BranchStatus {
+  Lead
+  Active
+  Inactive
+}
+
+enum RequirementStatus {
+  PendingApproval
+  Open
+  Filled
+  Cancelled
+  OnHold
+}
+
+enum ApplicationStatus {
+  Applied
+  Shortlisted
+  InterviewScheduled
+  Offered
+  Joined
+  Rejected
+  Withdrawn
+}
+
+enum ReplacementStatus {
+  None
+  ResignationSubmitted
+  AdminVerified
+  ReplacementRequirementReopened
+  ReplacementCompleted
+}
+
+enum InvoiceStatus {
+  Draft
+  Sent
+  Paid
+  Overdue
+  Cancelled
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String?   @map("password_hash")
+  role         UserRole  @default(CANDIDATE)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  candidate      Candidate?
+  companyContact CompanyContact?
+
+  @@map("users")
+}
+
+model Skill {
+  id       String   @id @default(uuid())
+  name     String   @unique
+  category String
+
+  candidateSkills   CandidateSkill[]
+  requirementSkills RequirementSkill[]
+
+  @@map("skills")
+}
+
+model Candidate {
+  id                   String            @id @default(uuid())
+  userId               String?           @unique @map("user_id")
+  fullName             String            @map("full_name")
+  mobile               String            @unique
+  email                String
+  currentLocation      String?           @map("current_location")
+  preferredJobLocation String?           @map("preferred_job_location")
+  experienceLevel      ExperienceLevel   @default(Fresher) @map("experience_level")
+  totalExperienceYears Decimal?          @map("total_experience_years") @db.Decimal(4, 1)
+  preferredCategory    PreferredCategory @map("preferred_category")
+  expectedSalary       String?           @map("expected_salary")
+  noticePeriod         String?           @map("notice_period")
+  resumeUrl            String?           @map("resume_url")
+  isBlacklisted        Boolean           @default(false) @map("is_blacklisted")
+  blacklistReason      String?           @map("blacklist_reason")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  user         User?            @relation(fields: [userId], references: [id])
+  skills       CandidateSkill[]
+  education    Education[]
+  experiences  WorkExperience[]
+  applications Application[]
+
+  @@map("candidates")
+}
+
+model CandidateSkill {
+  candidateId String @map("candidate_id")
+  skillId     String @map("skill_id")
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  skill     Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([candidateId, skillId])
+  @@map("candidate_skills")
+}
+
+model Education {
+  id            String  @id @default(uuid())
+  candidateId   String  @map("candidate_id")
+  degree        String
+  specialization String?
+  institution   String
+  passingYear   Int?    @map("passing_year")
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@map("education")
+}
+
+model WorkExperience {
+  id          String    @id @default(uuid())
+  candidateId String    @map("candidate_id")
+  companyName String    @map("company_name")
+  designation String
+  startDate   DateTime? @map("start_date")
+  endDate     DateTime? @map("end_date")
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@map("work_experiences")
+}
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  brandName String?  @map("brand_name")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  branches CompanyBranch[]
+
+  @@map("companies")
+}
+
+model CompanyBranch {
+  id                    String       @id @default(uuid())
+  companyId             String       @map("company_id")
+  branchName            String       @map("branch_name")
+  city                  String
+  address               String?
+  status                BranchStatus @default(Lead)
+  termsAgreementSigned  Boolean      @default(false) @map("terms_agreement_signed")
+  termsSignedAt         DateTime?    @map("terms_signed_at")
+  termsSignedByIp       String?      @map("terms_signed_by_ip")
+  defaultCommissionRate Decimal?     @map("default_commission_rate") @db.Decimal(5, 2)
+  paymentTermsDays      Int          @default(30) @map("payment_terms_days")
+  createdAt             DateTime     @default(now()) @map("created_at")
+
+  company         Company          @relation(fields: [companyId], references: [id])
+  contacts        CompanyContact[]
+  jobRequirements JobRequirement[]
+  termsSnapshots  TermsSnapshot[]
+
+  @@map("company_branches")
+}
+
+model CompanyContact {
+  id              String   @id @default(uuid())
+  userId          String?  @unique @map("user_id")
+  companyBranchId String   @map("company_branch_id")
+  fullName        String   @map("full_name")
+  email           String   @unique
+  mobile          String
+  designation     String?
+  isApproved      Boolean  @default(false) @map("is_approved")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user   User?         @relation(fields: [userId], references: [id])
+  branch CompanyBranch @relation(fields: [companyBranchId], references: [id])
+
+  @@map("company_contacts")
+}
+
+model TermsSnapshot {
+  id              String   @id @default(uuid())
+  companyBranchId String   @map("company_branch_id")
+  termsVersion    String   @map("terms_version")
+  snapshotUrl     String   @map("snapshot_url")
+  signedAt        DateTime @default(now()) @map("signed_at")
+
+  branch CompanyBranch @relation(fields: [companyBranchId], references: [id])
+
+  @@map("terms_snapshots")
+}
+
+model JobRequirement {
+  id                  String            @id @default(uuid())
+  companyBranchId     String            @map("company_branch_id")
+  title               String
+  hiringCategory      PreferredCategory @map("hiring_category")
+  noOfVacancies       Int               @default(1) @map("no_of_vacancies")
+  minExperienceYears  Decimal           @default(0) @map("min_experience_years") @db.Decimal(4, 1)
+  maxSalaryLpa        Decimal?          @map("max_salary_lpa") @db.Decimal(10, 2)
+  jobDescription      String?           @map("job_description")
+  status              RequirementStatus @default(PendingApproval)
+  isReplacement       Boolean           @default(false) @map("is_replacement")
+  replacesPlacementId String?           @map("replaces_placement_id")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  branch       CompanyBranch      @relation(fields: [companyBranchId], references: [id])
+  skills       RequirementSkill[]
+  applications Application[]
+
+  @@map("job_requirements")
+}
+
+model RequirementSkill {
+  jobRequirementId String @map("job_requirement_id")
+  skillId          String @map("skill_id")
+
+  requirement JobRequirement @relation(fields: [jobRequirementId], references: [id], onDelete: Cascade)
+  skill       Skill          @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([jobRequirementId, skillId])
+  @@map("requirement_skills")
+}
+
+model Application {
+  id               String            @id @default(uuid())
+  candidateId      String            @map("candidate_id")
+  jobRequirementId String            @map("job_requirement_id")
+  assignedUserId   String?           @map("assigned_user_id")
+  status           ApplicationStatus @default(Applied)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  candidate   Candidate                  @relation(fields: [candidateId], references: [id])
+  requirement JobRequirement             @relation(fields: [jobRequirementId], references: [id])
+  history     ApplicationStatusHistory[]
+  placement   Placement?
+
+  @@unique([candidateId, jobRequirementId])
+  @@map("applications")
+}
+
+model ApplicationStatusHistory {
+  id              String            @id @default(uuid())
+  applicationId   String            @map("application_id")
+  fromStatus      ApplicationStatus @map("from_status")
+  toStatus        ApplicationStatus @map("to_status")
+  changedByUserId String            @map("changed_by_user_id")
+  notes           String?
+  changedAt       DateTime          @default(now()) @map("changed_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("application_status_history")
+}
+
+model Placement {
+  id                     String            @id @default(uuid())
+  applicationId          String            @unique @map("application_id")
+  joiningDate            DateTime          @map("joining_date")
+  agreedCtc              Decimal           @map("agreed_ctc") @db.Decimal(12, 2)
+  commissionRateApplied  Decimal           @map("commission_rate_applied") @db.Decimal(5, 2)
+  commissionAmount       Decimal           @map("commission_amount") @db.Decimal(12, 2)
+  isActive               Boolean           @default(true) @map("is_active")
+  replacementStatus      ReplacementStatus @default(None) @map("replacement_status")
+  resignationProofUrl    String?           @map("resignation_proof_url")
+  resignationSubmittedAt DateTime?         @map("resignation_submitted_at")
+  replacesPlacementId    String?           @map("replaces_placement_id")
+  createdAt              DateTime          @default(now()) @map("created_at")
+
+  application Application @relation(fields: [applicationId], references: [id])
+  invoice     Invoice?
+
+  @@map("placements")
+}
+
+model Invoice {
+  id                      String        @id @default(uuid())
+  placementId             String        @unique @map("placement_id")
+  invoiceNumber           String        @unique @map("invoice_number")
+  subtotalAmount          Decimal       @map("subtotal_amount") @db.Decimal(12, 2)
+  taxAmount               Decimal       @map("tax_amount") @db.Decimal(12, 2)
+  totalAmount             Decimal       @map("total_amount") @db.Decimal(12, 2)
+  paymentTermsDaysApplied Int           @map("payment_terms_days_applied")
+  dueDate                 DateTime      @map("due_date")
+  status                  InvoiceStatus @default(Draft)
+  createdAt               DateTime      @default(now()) @map("created_at")
+
+  placement Placement @relation(fields: [placementId], references: [id])
+
+  @@map("invoices")
+}
