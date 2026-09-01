@@ -14,15 +14,18 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "@types/pdf-parse": "^1.1.5",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "lucide-react": "^1.33.0",
     "next": "16.3.2",
     "next-auth": "^5.0.0-beta.32",
+    "pdf-parse": "^2.4.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "resend": "^6.22.0",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "unpdf": "^1.8.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

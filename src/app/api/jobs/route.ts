@@ -46,13 +46,21 @@ export async function GET(req: Request) {
         minExperienceYears: Number(job.minExperienceYears),
         maxSalaryLpa: job.maxSalaryLpa ? Number(job.maxSalaryLpa) : null,
         city: job.branch.city,
-        companyName: maskedCompany.companyName, // Renders as "[Confidential Client]"
+        companyName: maskedCompany.companyName,
         skills: job.skills.map((s) => s.skill.name),
         createdAt: job.createdAt,
       };
     });
 
-    return NextResponse.json({ jobs: sanitizedJobs });
+    return NextResponse.json(
+      { jobs: sanitizedJobs },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "public, s-maxage=15, stale-while-revalidate=30",
+        },
+      }
+    );
   } catch (error: any) {
     console.error("Public Jobs API Error:", error);
     return NextResponse.json({ error: "Failed to fetch jobs." }, { status: 500 });

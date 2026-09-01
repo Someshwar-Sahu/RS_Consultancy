@@ -41,6 +41,18 @@ export async function POST(req: Request) {
       );
     }
 
+    // Rule 8 & Guarantee Window Check: Verify replacement window is active
+    const windowDays = originalPlacement.replacementWindowDaysApplied || 60;
+    const expiryDate = new Date(originalPlacement.joiningDate);
+    expiryDate.setDate(expiryDate.getDate() + windowDays);
+
+    if (new Date() > expiryDate) {
+      return NextResponse.json(
+        { error: `Replacement Guarantee Expired: The ${windowDays}-day replacement window for this placement has expired.` },
+        { status: 400 }
+      );
+    }
+
     // Admin Verification Gate: Process resignation & reopen requirement inside transaction
     const result = await db.$transaction(async (tx) => {
       // 1. Mark original Placement as inactive and replacement verified
@@ -54,7 +66,15 @@ export async function POST(req: Request) {
         },
       });
 
-      // 2. Reopen job requirement for free replacement hire
+      // 2. Decrement vacanciesFilled on original parent requirement
+      await tx.jobRequirement.update({
+        where: { id: originalPlacement.application.jobRequirementId },
+        data: {
+          vacanciesFilled: { decrement: 1 },
+        },
+      }).catch(() => {});
+
+      // 3. Reopen job requirement for free replacement hire
       const replacementJob = await tx.jobRequirement.create({
         data: {
           companyBranchId: originalPlacement.application.requirement.companyBranchId,

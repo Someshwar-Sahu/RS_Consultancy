@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -29,6 +31,24 @@ enum PreferredCategory {
   Bulk
   Driver
   FieldStaff
+}
+
+enum DlCategory {
+  LMV
+  HMV
+  Commercial
+  TwoWheeler
+}
+
+enum PoliceVerificationStatus {
+  NotSubmitted
+  Pending
+  Verified
+}
+
+enum RequirementCategoryType {
+  Corporate
+  Driver
 }
 
 enum BranchStatus {
@@ -80,8 +100,9 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  candidate      Candidate?
-  companyContact CompanyContact?
+  candidate          Candidate?
+  companyContact     CompanyContact?
+  inAppNotifications InAppNotification[]
 
   @@map("users")
 }
@@ -98,31 +119,58 @@ model Skill {
 }
 
 model Candidate {
-  id                   String            @id @default(uuid())
-  userId               String?           @unique @map("user_id")
-  fullName             String            @map("full_name")
-  mobile               String            @unique
-  email                String
-  currentLocation      String?           @map("current_location")
-  preferredJobLocation String?           @map("preferred_job_location")
-  experienceLevel      ExperienceLevel   @default(Fresher) @map("experience_level")
-  totalExperienceYears Decimal?          @map("total_experience_years") @db.Decimal(4, 1)
-  preferredCategory    PreferredCategory @map("preferred_category")
-  expectedSalary       String?           @map("expected_salary")
-  noticePeriod         String?           @map("notice_period")
-  resumeUrl            String?           @map("resume_url")
-  isBlacklisted        Boolean           @default(false) @map("is_blacklisted")
-  blacklistReason      String?           @map("blacklist_reason")
-  createdAt            DateTime          @default(now()) @map("created_at")
-  updatedAt            DateTime          @updatedAt @map("updated_at")
+  id                         String                   @id @default(uuid())
+  userId                     String?                  @unique @map("user_id")
+  fullName                   String                   @map("full_name")
+  mobile                     String                   @unique
+  email                      String
+  currentLocation            String?                  @map("current_location")
+  preferredJobLocation       String?                  @map("preferred_job_location")
+  experienceLevel            ExperienceLevel          @default(Fresher) @map("experience_level")
+  totalExperienceYears       Decimal?                 @map("total_experience_years") @db.Decimal(4, 1)
+  preferredCategory          PreferredCategory        @map("preferred_category")
+  expectedSalary             String?                  @map("expected_salary")
+  noticePeriod               String?                  @map("notice_period")
+  resumeUrl                  String?                  @map("resume_url")
+  drivingLicenseNumber       String?                  @map("driving_license_number")
+  dlCategory                 DlCategory?              @map("dl_category")
+  dlExpiryDate               DateTime?                @map("dl_expiry_date")
+  vehicleTypes               String?                  @map("vehicle_types")
+  policeVerificationStatus   PoliceVerificationStatus @default(NotSubmitted) @map("police_verification_status")
+  policeVerificationDocUrl   String?                  @map("police_verification_doc_url")
+  isBlacklisted              Boolean                  @default(false) @map("is_blacklisted")
+  blacklistReason            String?                  @map("blacklist_reason")
+  createdByUserId            String?                  @map("created_by_user_id")
+  source                     String?                  @default("PUBLIC") @map("source")
+  representationExpiresAt    DateTime?                @map("representation_expires_at")
+  uanNumber                  String?                  @map("uan_number")
+  esicNumber                 String?                  @map("esic_number")
+  createdAt                  DateTime                 @default(now()) @map("created_at")
+  updatedAt                  DateTime                 @updatedAt @map("updated_at")
 
   user         User?            @relation(fields: [userId], references: [id])
   skills       CandidateSkill[]
   education    Education[]
   experiences  WorkExperience[]
+  resumes      CandidateResume[]
   applications Application[]
 
+  @@index([preferredCategory, experienceLevel])
   @@map("candidates")
+}
+
+model CandidateResume {
+  id          String   @id @default(uuid())
+  candidateId String   @map("candidate_id")
+  label       String
+  fileUrl     String   @map("file_url")
+  isDefault   Boolean  @default(false) @map("is_default")
+  uploadedAt  DateTime @default(now()) @map("uploaded_at")
+
+  candidate    Candidate     @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@map("resumes")
 }
 
 model CandidateSkill {
@@ -137,12 +185,13 @@ model CandidateSkill {
 }
 
 model Education {
-  id            String  @id @default(uuid())
-  candidateId   String  @map("candidate_id")
-  degree        String
+  id             String  @id @default(uuid())
+  candidateId    String  @map("candidate_id")
+  degree         String
   specialization String?
-  institution   String
-  passingYear   Int?    @map("passing_year")
+  institution    String
+  passingYear    Int?    @map("passing_year")
+  grade          String?
 
   candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
@@ -156,6 +205,7 @@ model WorkExperience {
   designation String
   startDate   DateTime? @map("start_date")
   endDate     DateTime? @map("end_date")
+  description String?
 
   candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
@@ -174,18 +224,21 @@ model Company {
 }
 
 model CompanyBranch {
-  id                    String       @id @default(uuid())
-  companyId             String       @map("company_id")
-  branchName            String       @map("branch_name")
-  city                  String
-  address               String?
-  status                BranchStatus @default(Lead)
-  termsAgreementSigned  Boolean      @default(false) @map("terms_agreement_signed")
-  termsSignedAt         DateTime?    @map("terms_signed_at")
-  termsSignedByIp       String?      @map("terms_signed_by_ip")
-  defaultCommissionRate Decimal?     @map("default_commission_rate") @db.Decimal(5, 2)
-  paymentTermsDays      Int          @default(30) @map("payment_terms_days")
-  createdAt             DateTime     @default(now()) @map("created_at")
+  id                            String       @id @default(uuid())
+  companyId                     String       @map("company_id")
+  branchName                    String       @map("branch_name")
+  city                          String
+  address                       String?
+  status                        BranchStatus @default(Lead)
+  termsAgreementSigned          Boolean      @default(false) @map("terms_agreement_signed")
+  termsSignedAt                 DateTime?    @map("terms_signed_at")
+  termsSignedByIp               String?      @map("terms_signed_by_ip")
+  termsSignedByName             String?      @map("terms_signed_by_name")
+  defaultCommissionRate         Decimal?     @map("default_commission_rate") @db.Decimal(5, 2)
+  paymentTermsDays              Int          @default(30) @map("payment_terms_days")
+  defaultReplacementWindowDays  Int          @default(60) @map("default_replacement_window_days")
+  clientCreditLimit             Decimal?     @map("client_credit_limit") @db.Decimal(12, 2)
+  createdAt                     DateTime     @default(now()) @map("created_at")
 
   company         Company          @relation(fields: [companyId], references: [id])
   contacts        CompanyContact[]
@@ -203,6 +256,7 @@ model CompanyContact {
   email           String   @unique
   mobile          String
   designation     String?
+  isPrimary       Boolean  @default(false) @map("is_primary")
   isApproved      Boolean  @default(false) @map("is_approved")
   createdAt       DateTime @default(now()) @map("created_at")
 
@@ -217,6 +271,7 @@ model TermsSnapshot {
   companyBranchId String   @map("company_branch_id")
   termsVersion    String   @map("terms_version")
   snapshotUrl     String   @map("snapshot_url")
+  termsTextHash   String?  @map("terms_text_hash")
   signedAt        DateTime @default(now()) @map("signed_at")
 
   branch CompanyBranch @relation(fields: [companyBranchId], references: [id])
@@ -225,24 +280,34 @@ model TermsSnapshot {
 }
 
 model JobRequirement {
-  id                  String            @id @default(uuid())
-  companyBranchId     String            @map("company_branch_id")
-  title               String
-  hiringCategory      PreferredCategory @map("hiring_category")
-  noOfVacancies       Int               @default(1) @map("no_of_vacancies")
-  minExperienceYears  Decimal           @default(0) @map("min_experience_years") @db.Decimal(4, 1)
-  maxSalaryLpa        Decimal?          @map("max_salary_lpa") @db.Decimal(10, 2)
-  jobDescription      String?           @map("job_description")
-  status              RequirementStatus @default(PendingApproval)
-  isReplacement       Boolean           @default(false) @map("is_replacement")
-  replacesPlacementId String?           @map("replaces_placement_id")
-  createdAt           DateTime          @default(now()) @map("created_at")
-  updatedAt           DateTime          @updatedAt @map("updated_at")
+  id                            String                  @id @default(uuid())
+  companyBranchId               String                  @map("company_branch_id")
+  title                         String
+  hiringCategory                PreferredCategory       @map("hiring_category")
+  categoryType                  RequirementCategoryType @default(Corporate) @map("category_type")
+  noOfVacancies                 Int                     @default(1) @map("no_of_vacancies")
+  vacanciesFilled               Int                     @default(0) @map("vacancies_filled")
+  minExperienceYears            Decimal                 @default(0) @map("min_experience_years") @db.Decimal(4, 1)
+  maxSalaryLpa                  Decimal?                @map("max_salary_lpa") @db.Decimal(10, 2)
+  jobDescription                String?                 @map("job_description")
+  commissionRateOverride        Decimal?                @map("commission_rate_override") @db.Decimal(5, 2)
+  paymentTermsDaysOverride      Int?                    @map("payment_terms_days_override")
+  replacementWindowDaysOverride Int?                    @map("replacement_window_days_override")
+  vehicleTypesRequired          String?                 @map("vehicle_types_required")
+  dlCategoryRequired            DlCategory?             @map("dl_category_required")
+  dutyHours                     String?                 @map("duty_hours")
+  joiningTimeline               String?                 @map("joining_timeline")
+  status                        RequirementStatus       @default(PendingApproval)
+  isReplacement                 Boolean                 @default(false) @map("is_replacement")
+  replacesPlacementId           String?                 @map("replaces_placement_id")
+  createdAt                     DateTime                @default(now()) @map("created_at")
+  updatedAt                     DateTime                @updatedAt @map("updated_at")
 
   branch       CompanyBranch      @relation(fields: [companyBranchId], references: [id])
   skills       RequirementSkill[]
   applications Application[]
 
+  @@index([companyBranchId, status])
   @@map("job_requirements")
 }
 
@@ -258,20 +323,25 @@ model RequirementSkill {
 }
 
 model Application {
-  id               String            @id @default(uuid())
-  candidateId      String            @map("candidate_id")
-  jobRequirementId String            @map("job_requirement_id")
-  assignedUserId   String?           @map("assigned_user_id")
-  status           ApplicationStatus @default(Applied)
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
+  id                           String            @id @default(uuid())
+  candidateId                  String            @map("candidate_id")
+  jobRequirementId             String            @map("job_requirement_id")
+  resumeId                     String?           @map("resume_id")
+  assignedUserId               String?           @map("assigned_user_id")
+  status                       ApplicationStatus @default(Applied)
+  rejectionReason              String?           @map("rejection_reason")
+  shareRejectionWithCandidate  Boolean           @default(false) @map("share_rejection_with_candidate")
+  createdAt                    DateTime          @default(now()) @map("created_at")
+  updatedAt                    DateTime          @updatedAt @map("updated_at")
 
   candidate   Candidate                  @relation(fields: [candidateId], references: [id])
   requirement JobRequirement             @relation(fields: [jobRequirementId], references: [id])
+  resume      CandidateResume?           @relation(fields: [resumeId], references: [id])
   history     ApplicationStatusHistory[]
   placement   Placement?
 
   @@unique([candidateId, jobRequirementId])
+  @@index([assignedUserId, status])
   @@map("applications")
 }
 
@@ -290,18 +360,24 @@ model ApplicationStatusHistory {
 }
 
 model Placement {
-  id                     String            @id @default(uuid())
-  applicationId          String            @unique @map("application_id")
-  joiningDate            DateTime          @map("joining_date")
-  agreedCtc              Decimal           @map("agreed_ctc") @db.Decimal(12, 2)
-  commissionRateApplied  Decimal           @map("commission_rate_applied") @db.Decimal(5, 2)
-  commissionAmount       Decimal           @map("commission_amount") @db.Decimal(12, 2)
-  isActive               Boolean           @default(true) @map("is_active")
-  replacementStatus      ReplacementStatus @default(None) @map("replacement_status")
-  resignationProofUrl    String?           @map("resignation_proof_url")
-  resignationSubmittedAt DateTime?         @map("resignation_submitted_at")
-  replacesPlacementId    String?           @map("replaces_placement_id")
-  createdAt              DateTime          @default(now()) @map("created_at")
+  id                             String            @id @default(uuid())
+  applicationId                  String            @unique @map("application_id")
+  joiningDate                    DateTime          @map("joining_date")
+  agreedCtc                      Decimal           @map("agreed_ctc") @db.Decimal(12, 2)
+  commissionRateApplied          Decimal           @map("commission_rate_applied") @db.Decimal(5, 2)
+  commissionAmount               Decimal           @map("commission_amount") @db.Decimal(12, 2)
+  replacementWindowDaysApplied   Int?              @map("replacement_window_days_applied")
+  isActive                       Boolean           @default(true) @map("is_active")
+  replacementStatus              ReplacementStatus @default(None) @map("replacement_status")
+  resignationProofUrl            String?           @map("resignation_proof_url")
+  resignationSubmittedAt         DateTime?         @map("resignation_submitted_at")
+  leftDate                       DateTime?         @map("left_date")
+  replacesPlacementId            String?           @map("replaces_placement_id")
+  sourcingUserId                 String?           @map("sourcing_user_id")
+  accountManagerUserId           String?           @map("account_manager_user_id")
+  signOnBonusIncluded            Boolean           @default(false) @map("sign_on_bonus_included")
+  noticeBuyoutIncluded           Boolean           @default(false) @map("notice_buyout_included")
+  createdAt                      DateTime          @default(now()) @map("created_at")
 
   application Application @relation(fields: [applicationId], references: [id])
   invoice     Invoice?
@@ -314,14 +390,86 @@ model Invoice {
   placementId             String        @unique @map("placement_id")
   invoiceNumber           String        @unique @map("invoice_number")
   subtotalAmount          Decimal       @map("subtotal_amount") @db.Decimal(12, 2)
+  gstApplicable           Boolean       @default(true) @map("gst_applicable")
+  gstin                   String?
+  clientGstin             String?       @map("client_gstin")
+  taxType                 String?       @map("tax_type")
+  cgstAmount              Decimal?      @map("cgst_amount") @db.Decimal(12, 2)
+  sgstAmount              Decimal?      @map("sgst_amount") @db.Decimal(12, 2)
+  igstAmount              Decimal?      @map("igst_amount") @db.Decimal(12, 2)
   taxAmount               Decimal       @map("tax_amount") @db.Decimal(12, 2)
   totalAmount             Decimal       @map("total_amount") @db.Decimal(12, 2)
+  tdsDeducted             Decimal?      @map("tds_deducted") @db.Decimal(12, 2)
+  netReceivedAmount       Decimal?      @map("net_received_amount") @db.Decimal(12, 2)
+  partialPaidAmount       Decimal?      @map("partial_paid_amount") @db.Decimal(12, 2)
   paymentTermsDaysApplied Int           @map("payment_terms_days_applied")
   dueDate                 DateTime      @map("due_date")
+  paidDate                DateTime?     @map("paid_date")
+  paymentSource           String?       @map("payment_source")
   status                  InvoiceStatus @default(Draft)
   createdAt               DateTime      @default(now()) @map("created_at")
 
   placement Placement @relation(fields: [placementId], references: [id])
 
+  @@index([status, dueDate])
   @@map("invoices")
+}
+
+model UserInvite {
+  id         String    @id @default(uuid())
+  email      String    @unique
+  role       UserRole  @default(EMPLOYEE)
+  tokenHash  String    @unique @map("token_hash")
+  invitedBy  String    @map("invited_by")
+  expiresAt  DateTime  @map("expires_at")
+  acceptedAt DateTime? @map("accepted_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@map("user_invites")
+}
+
+model SiteSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}
+
+model InAppNotification {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  type             String
+  title            String
+  message          String
+  linkUrl          String?  @map("link_url")
+  isRead           Boolean  @default(false) @map("is_read")
+  whatsappMessageId String?  @map("whatsapp_message_id")
+  deliveryStatus   String?  @default("Sent") @map("delivery_status")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("in_app_notifications")
+}
+
+enum OtpType {
+  SIGNUP
+  PASSWORD_RESET
+}
+
+model VerificationOtp {
+  id        String   @id @default(uuid())
+  email     String
+  mobile    String?
+  otpCode   String   @map("otp_code")
+  type      OtpType  @default(SIGNUP)
+  verified  Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, otpCode])
+  @@map("verification_otps")
 }

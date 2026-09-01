@@ -5,13 +5,23 @@ import bcrypt from "bcryptjs";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { companyName, city, contactName, email, mobile, password, designation } = body;
+    const { companyName, city, contactName, email, mobile, password, designation, gstin } = body;
 
     if (!companyName || !city || !contactName || !email || !mobile || !password) {
       return NextResponse.json(
         { error: "All required fields must be filled." },
         { status: 400 }
       );
+    }
+
+    if (gstin && gstin.trim()) {
+      const gstinRegex = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
+      if (!gstinRegex.test(gstin.trim())) {
+        return NextResponse.json(
+          { error: "Invalid GSTIN format. Must be a valid 15-character GST Identification Number (e.g. 07AAAAA0000A1Z5)." },
+          { status: 400 }
+        );
+      }
     }
 
     // 1. Create or find Company Brand Record

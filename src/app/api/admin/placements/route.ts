@@ -36,10 +36,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Application not found." }, { status: 404 });
     }
 
-    // Compute commission amount: CTC * rate / 100
     const ctcNum = Number(agreedCtc);
     const rateNum = Number(commissionRate);
-    const commissionAmount = (ctcNum * rateNum) / 100;
+
+    // Enforce minimum placement fee floor (e.g. ₹25,000 minimum fee)
+    const MIN_PLACEMENT_FLOOR = 25000;
+    const computedCommission = (ctcNum * rateNum) / 100;
+    const commissionAmount = Math.max(computedCommission, MIN_PLACEMENT_FLOOR);
+
+    const { sourcingUserId, signOnBonusIncluded, noticeBuyoutIncluded } = body;
 
     // Create Placement inside a transaction
     const placement = await db.$transaction(async (tx) => {
@@ -59,11 +64,29 @@ export async function POST(req: Request) {
           commissionAmount,
           isActive: true,
           replacesPlacementId: replacesPlacementId || null,
+          sourcingUserId: sourcingUserId || null,
+          signOnBonusIncluded: Boolean(signOnBonusIncluded),
+          noticeBuyoutIncluded: Boolean(noticeBuyoutIncluded),
         },
       });
 
+      // Enforce 15% gross margin floor check unless explicit fee floor of 25k is met
+      if (Number(commissionRate) < 15.0 && Number(commissionAmount) < 25000) {
+        return NextResponse.json(
+          { error: "Commercial Margin Floor Violation: Minimum agency placement commission is 15% CTC or ₹25,000." },
+          { status: 400 }
+        );
+      }
+
       // 3. Rule 4: ONLY create invoice if NOT a free replacement placement
       if (!replacesPlacementId) {
+        const clientCity = (application.requirement.branch.city || "").toLowerCase();
+        // Determine tax type: Delhi/NCR agency headquarters (Intra-state = CGST+SGST, Inter-state = IGST)
+        const isIntraState = clientCity.includes("delhi") || clientCity.includes("ncr") || clientCity.includes("new delhi");
+        const taxType = isIntraState ? "CGST_SGST" : "IGST";
+        const cgstAmount = isIntraState ? (commissionAmount * 9) / 100 : null;
+        const sgstAmount = isIntraState ? (commissionAmount * 9) / 100 : null;
+        const igstAmount = !isIntraState ? (commissionAmount * 18) / 100 : null;
         const taxAmount = (commissionAmount * 18) / 100; // 18% GST standard
         const totalAmount = commissionAmount + taxAmount;
         const paymentDays = application.requirement.branch.paymentTermsDays || 30;
@@ -71,13 +94,22 @@ export async function POST(req: Request) {
         const dueDate = new Date(joiningDate);
         dueDate.setDate(dueDate.getDate() + paymentDays);
 
-        const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        const invoiceNumber = `INV-${Date.now()}-${randomSuffix}`;
+
+        const crypto = await import("crypto");
+        const irnRawStr = `${invoiceNumber}|07AAAAA0000A1Z5|${totalAmount.toFixed(2)}|${Date.now()}`;
+        const irnReference = crypto.createHash("sha256").update(irnRawStr).digest("hex");
 
         await tx.invoice.create({
           data: {
             placementId: newPlacement.id,
             invoiceNumber,
             subtotalAmount: commissionAmount,
+            taxType,
+            cgstAmount,
+            sgstAmount,
+            igstAmount,
             taxAmount,
             totalAmount,
             paymentTermsDaysApplied: paymentDays,
@@ -86,6 +118,14 @@ export async function POST(req: Request) {
           },
         });
       }
+
+      // 4. Atomically increment vacanciesFilled on parent JobRequirement
+      await tx.jobRequirement.update({
+        where: { id: application.jobRequirementId },
+        data: {
+          vacanciesFilled: { increment: 1 },
+        },
+      });
 
       return newPlacement;
     });
