@@ -45,27 +45,34 @@ export async function POST(req: Request) {
     }
     const fullMobile = `${countryCode} ${digitsOnly}`;
 
-    // 1. Create or Find User Login Account securely without unauthenticated password overwrite
+    // 1. Create or Find User Login Account securely without unauthenticated password overwrite or mobile hijack
     let userId: string | null = null;
     const existingUser = await db.user.findUnique({ where: { email } });
-
     if (existingUser) {
       return NextResponse.json(
         { error: "An account with this email address already exists. Please log in to update your profile or apply for jobs." },
         { status: 400 }
       );
-    } else {
-      const initialPassword = (password && password.length >= 6) ? password : rawMobile;
-      const passwordHash = await bcrypt.hash(initialPassword, 10);
-      const newUser = await db.user.create({
-        data: {
-          email,
-          passwordHash,
-          role: "CANDIDATE",
-        },
-      });
-      userId = newUser.id;
     }
+
+    const existingCandidateMobile = await db.candidate.findFirst({ where: { mobile: fullMobile } });
+    if (existingCandidateMobile) {
+      return NextResponse.json(
+        { error: "A candidate profile with this mobile number already exists. Please log in to your account." },
+        { status: 400 }
+      );
+    }
+
+    const initialPassword = (password && password.length >= 6) ? password : rawMobile;
+    const passwordHash = await bcrypt.hash(initialPassword, 10);
+    const newUser = await db.user.create({
+      data: {
+        email,
+        passwordHash,
+        role: "CANDIDATE",
+      },
+    });
+    userId = newUser.id;
 
     const preferredCategory = categoryInput as PreferredCategory;
     const experienceLevel = (expInput as ExperienceLevel) || ExperienceLevel.Fresher;
@@ -82,61 +89,26 @@ export async function POST(req: Request) {
       resumeUrl = await uploadFile(buffer, resumeFile.name, resumeFile.type || "application/pdf");
     }
 
-    // 3. Create or update Candidate record
-    let candidate = null;
-    if (userId) {
-      candidate = await db.candidate.findUnique({ where: { userId } });
-    }
-    if (!candidate) {
-      candidate = await db.candidate.findFirst({
-        where: {
-          OR: [{ mobile: fullMobile }, { email }],
-        },
-      });
-    }
-
-    if (candidate) {
-      candidate = await db.candidate.update({
-        where: { id: candidate.id },
-        data: {
-          userId: userId || candidate.userId,
-          fullName,
-          email,
-          mobile: fullMobile,
-          currentLocation,
-          preferredJobLocation,
-          preferredCategory,
-          experienceLevel,
-          expectedSalary,
-          noticePeriod,
-          drivingLicenseNumber,
-          dlCategory,
-          vehicleTypes,
-          policeVerificationStatus,
-          ...(resumeUrl ? { resumeUrl } : {}),
-        },
-      });
-    } else {
-      candidate = await db.candidate.create({
-        data: {
-          userId,
-          fullName,
-          mobile: fullMobile,
-          email,
-          currentLocation,
-          preferredJobLocation,
-          preferredCategory,
-          experienceLevel,
-          expectedSalary,
-          noticePeriod,
-          drivingLicenseNumber,
-          dlCategory,
-          vehicleTypes,
-          policeVerificationStatus,
-          resumeUrl: resumeUrl || null,
-        },
-      });
-    }
+    // 3. Create new Candidate record
+    const candidate = await db.candidate.create({
+      data: {
+        userId,
+        fullName,
+        mobile: fullMobile,
+        email,
+        currentLocation,
+        preferredJobLocation,
+        preferredCategory,
+        experienceLevel,
+        expectedSalary,
+        noticePeriod,
+        drivingLicenseNumber,
+        dlCategory,
+        vehicleTypes,
+        policeVerificationStatus,
+        resumeUrl: resumeUrl || null,
+      },
+    });
 
     // 4. Save Candidate Resume in `resumes` table
     if (resumeUrl) {
