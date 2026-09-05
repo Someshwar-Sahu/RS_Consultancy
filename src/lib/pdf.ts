@@ -62,7 +62,8 @@ export function isContactUnmaskedForViewer(viewer: ViewerContext): boolean {
       "Offered",
       "Joined",
     ].includes(viewer.applicationStatus || "");
-    return isInterviewOrLater && Boolean(viewer.termsSigned);
+    const driverAckValid = !viewer.isDriverRequirement || Boolean(viewer.driverLiabilityAck);
+    return isInterviewOrLater && Boolean(viewer.termsSigned) && driverAckValid;
   }
   return false;
 }

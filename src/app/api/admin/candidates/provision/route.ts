@@ -85,16 +85,18 @@ export async function POST(req: Request) {
     const plainPassword = customPassword || `RS@${digitsOnly.slice(-4)}!`;
     const passwordHash = await bcrypt.hash(plainPassword, 10);
 
-    // 5. Create User Login Account
-    const user = await db.user.upsert({
-      where: { email: finalEmail },
-      update: { passwordHash, role: "CANDIDATE" },
-      create: {
-        email: finalEmail,
-        passwordHash,
-        role: "CANDIDATE",
-      },
-    });
+    // 5. Create User Login Account securely without accidental password overwrites
+    const existingUser = await db.user.findUnique({ where: { email: finalEmail } });
+    let user = existingUser;
+    if (!user) {
+      user = await db.user.create({
+        data: {
+          email: finalEmail,
+          passwordHash,
+          role: "CANDIDATE",
+        },
+      });
+    }
 
     // 6. Create Candidate / Driver Profile with Attribution
     const candidate = await db.candidate.create({

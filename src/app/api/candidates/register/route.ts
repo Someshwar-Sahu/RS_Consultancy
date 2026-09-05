@@ -45,39 +45,29 @@ export async function POST(req: Request) {
     }
     const fullMobile = `${countryCode} ${digitsOnly}`;
 
-    // 1. Create or Find User Login Account
+    // 1. Create or Find User Login Account securely without unauthenticated password overwrite
     let userId: string | null = null;
-    if (password && password.length >= 6) {
-      const passwordHash = await bcrypt.hash(password, 10);
-      const user = await db.user.upsert({
-        where: { email },
-        update: {
-          passwordHash,
-          role: "CANDIDATE",
-        },
-        create: {
+    const existingUser = await db.user.findUnique({ where: { email } });
+
+    if (existingUser) {
+      if (existingUser.role !== "CANDIDATE") {
+        return NextResponse.json(
+          { error: "An account with this email address already exists. Please log in with your existing account." },
+          { status: 400 }
+        );
+      }
+      userId = existingUser.id;
+    } else {
+      const initialPassword = (password && password.length >= 6) ? password : rawMobile;
+      const passwordHash = await bcrypt.hash(initialPassword, 10);
+      const newUser = await db.user.create({
+        data: {
           email,
           passwordHash,
           role: "CANDIDATE",
         },
       });
-      userId = user.id;
-    } else {
-      // Find existing user or create default
-      const existingUser = await db.user.findUnique({ where: { email } });
-      if (existingUser) {
-        userId = existingUser.id;
-      } else {
-        const tempHash = await bcrypt.hash(rawMobile, 10);
-        const user = await db.user.create({
-          data: {
-            email,
-            passwordHash: tempHash,
-            role: "CANDIDATE",
-          },
-        });
-        userId = user.id;
-      }
+      userId = newUser.id;
     }
 
     const preferredCategory = categoryInput as PreferredCategory;

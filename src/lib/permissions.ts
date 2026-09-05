@@ -5,6 +5,8 @@ export interface ViewerContext {
     companyBranchId?: string;
     termsSigned?: Boolean;
     applicationStatus?: string;
+    driverLiabilityAck?: boolean;
+    isDriverRequirement?: boolean;
 }
 
 export function maskCandidateForViewer<T extends { mobile?: string; email?: string }>(
@@ -20,7 +22,8 @@ export function maskCandidateForViewer<T extends { mobile?: string; email?: stri
             "Offered",
             "Joined",
         ].includes(viewer.applicationStatus || "");
-        const canUnmask = isInterviewOrLater && Boolean(viewer.termsSigned);
+        const driverAckValid = !viewer.isDriverRequirement || Boolean(viewer.driverLiabilityAck);
+        const canUnmask = isInterviewOrLater && Boolean(viewer.termsSigned) && driverAckValid;
 
         if (!canUnmask) {
             return {

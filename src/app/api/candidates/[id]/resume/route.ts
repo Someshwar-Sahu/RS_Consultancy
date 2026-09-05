@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { generateCandidateResumePdf } from "@/lib/pdf";
+import { generateCandidateResumePdf, isContactUnmaskedForViewer } from "@/lib/pdf";
 import { ViewerContext } from "@/lib/permissions";
 import { getFile } from "@/lib/storage";
 
@@ -69,6 +69,9 @@ export async function GET(
             companyBranchId: contact.companyBranchId,
           },
         },
+        include: {
+          requirement: true,
+        },
       });
 
       if (!application) {
@@ -79,8 +82,9 @@ export async function GET(
       }
 
       viewerContext.applicationStatus = application.status;
-      const isInterviewOrLater = ["InterviewScheduled", "Offered", "Joined"].includes(application.status);
-      companyCanUnmask = isInterviewOrLater && Boolean(contact.branch.termsAgreementSigned);
+      viewerContext.driverLiabilityAck = Boolean(application.driverLiabilityAckAt);
+      viewerContext.isDriverRequirement = application.requirement?.categoryType === "Driver" || candidate.preferredCategory === "Driver";
+      companyCanUnmask = isContactUnmaskedForViewer(viewerContext);
     }
 
     // Check if user is the candidate themselves
