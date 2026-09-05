@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { assignApplicationRoundRobin } from "@/lib/assignment";
+import { isContactUnmaskedForViewer } from "@/lib/pdf";
 
 export async function GET(req: Request) {
   try {
@@ -77,10 +78,14 @@ export async function GET(req: Request) {
       });
 
       const formattedApplications = applications.map((app) => {
-        const isInterviewOrLater = ["InterviewScheduled", "Offered", "Joined"].includes(app.status);
-        const isDriverReq = app.requirement?.categoryType === "Driver" || (app.candidate as any)?.preferredCategory === "Driver";
-        const driverAckValid = !isDriverReq || Boolean(app.driverLiabilityAckAt);
-        const canUnmask = isInterviewOrLater && Boolean(contact.branch.termsAgreementSigned) && driverAckValid;
+        const canUnmask = isContactUnmaskedForViewer({
+          role: "COMPANY_CONTACT",
+          companyBranchId: contact.companyBranchId,
+          termsSigned: contact.branch.termsAgreementSigned,
+          applicationStatus: app.status,
+          driverLiabilityAck: Boolean(app.driverLiabilityAckAt),
+          isDriverRequirement: app.requirement?.categoryType === "Driver" || (app.candidate as any)?.preferredCategory === "Driver",
+        });
         if (!canUnmask && app.candidate) {
           return {
             ...app,

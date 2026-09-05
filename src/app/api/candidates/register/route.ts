@@ -50,13 +50,10 @@ export async function POST(req: Request) {
     const existingUser = await db.user.findUnique({ where: { email } });
 
     if (existingUser) {
-      if (existingUser.role !== "CANDIDATE") {
-        return NextResponse.json(
-          { error: "An account with this email address already exists. Please log in with your existing account." },
-          { status: 400 }
-        );
-      }
-      userId = existingUser.id;
+      return NextResponse.json(
+        { error: "An account with this email address already exists. Please log in to update your profile or apply for jobs." },
+        { status: 400 }
+      );
     } else {
       const initialPassword = (password && password.length >= 6) ? password : rawMobile;
       const passwordHash = await bcrypt.hash(initialPassword, 10);

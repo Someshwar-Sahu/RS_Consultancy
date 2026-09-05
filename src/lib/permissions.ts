@@ -9,29 +9,19 @@ export interface ViewerContext {
     isDriverRequirement?: boolean;
 }
 
+import { isContactUnmaskedForViewer } from "@/lib/pdf";
+
 export function maskCandidateForViewer<T extends { mobile?: string; email?: string }>(
     candidate: T,
     viewer: ViewerContext
 ): T {
-    if (viewer.role === "ADMIN" || viewer.role === "EMPLOYEE") {
-        return candidate;
-    }
-    if (viewer.role === "COMPANY_CONTACT") {
-        const isInterviewOrLater = [
-            "InterviewScheduled",
-            "Offered",
-            "Joined",
-        ].includes(viewer.applicationStatus || "");
-        const driverAckValid = !viewer.isDriverRequirement || Boolean(viewer.driverLiabilityAck);
-        const canUnmask = isInterviewOrLater && Boolean(viewer.termsSigned) && driverAckValid;
-
-        if (!canUnmask) {
-            return {
-                ...candidate,
-                mobile: "•••••••••• (Masked until Interview Scheduled & Terms Signed)",
-                email: "•••••••••• (Masked until Interview Scheduled & Terms Signed)",
-            };
-        }
+    const canUnmask = isContactUnmaskedForViewer(viewer);
+    if (!canUnmask) {
+        return {
+            ...candidate,
+            mobile: "•••••••••• (Masked until Interview Scheduled & Terms Signed)",
+            email: "•••••••••• (Masked until Interview Scheduled & Terms Signed)",
+        };
     }
     return candidate;
 }
