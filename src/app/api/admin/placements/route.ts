@@ -44,6 +44,14 @@ export async function POST(req: Request) {
     const computedCommission = (ctcNum * rateNum) / 100;
     const commissionAmount = Math.max(computedCommission, MIN_PLACEMENT_FLOOR);
 
+    // Enforce 15% gross margin floor check unless explicit fee floor of 25k is met
+    if (rateNum < 15.0 && commissionAmount < MIN_PLACEMENT_FLOOR) {
+      return NextResponse.json(
+        { error: "Commercial Margin Floor Violation: Minimum agency placement commission is 15% CTC or ₹25,000." },
+        { status: 400 }
+      );
+    }
+
     const { sourcingUserId, accountManagerUserId, signOnBonusIncluded, noticeBuyoutIncluded } = body;
 
     // Create Placement inside a transaction
@@ -70,14 +78,6 @@ export async function POST(req: Request) {
           noticeBuyoutIncluded: Boolean(noticeBuyoutIncluded),
         },
       });
-
-      // Enforce 15% gross margin floor check unless explicit fee floor of 25k is met
-      if (Number(commissionRate) < 15.0 && Number(commissionAmount) < 25000) {
-        return NextResponse.json(
-          { error: "Commercial Margin Floor Violation: Minimum agency placement commission is 15% CTC or ₹25,000." },
-          { status: 400 }
-        );
-      }
 
       // 3. Rule 4: ONLY create invoice if NOT a free replacement placement
       if (!replacesPlacementId) {

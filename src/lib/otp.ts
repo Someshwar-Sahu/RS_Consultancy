@@ -104,10 +104,6 @@ export async function verifyOtpCode(
     return { valid: true };
   } catch (dbErr: any) {
     console.error("Database OTP Verification Error:", dbErr);
-    // In dev mode fallback
-    if (process.env.NODE_ENV === "development" && cleanCode.length === 6) {
-      return { valid: true };
-    }
     return { valid: false, error: "Could not verify code. Please try again." };
   }
 }

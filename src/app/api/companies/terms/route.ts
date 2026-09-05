@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { branchId, agreed, termsVersion = "v1.0-standard" } = body;
+    const { branchId, agreed, termsVersion = "v1.0-standard", signedByName } = body;
 
     if (!branchId || !agreed) {
       return NextResponse.json(
@@ -85,6 +85,9 @@ export async function POST(req: Request) {
     const clientIp = forwardedFor ? forwardedFor.split(",")[0].trim() : "127.0.0.1";
 
     const signedAt = new Date();
+    const crypto = await import("crypto");
+    const agreementBody = `RS BRIDGE TERMS OF BUSINESS VERSION: ${termsVersion} | Branch: ${branchId} | Signer: ${signedByName || "Authorized Representative"} | IP: ${clientIp} | Timestamp: ${signedAt.toISOString()}`;
+    const termsTextHash = crypto.createHash("sha256").update(agreementBody).digest("hex");
 
     // Transaction to update branch and create immutable terms snapshot
     const [updatedBranch, termsSnapshot] = await db.$transaction([
@@ -94,6 +97,7 @@ export async function POST(req: Request) {
           termsAgreementSigned: true,
           termsSignedAt: signedAt,
           termsSignedByIp: clientIp,
+          termsSignedByName: signedByName || undefined,
           status: "Active",
         },
       }),
@@ -102,14 +106,11 @@ export async function POST(req: Request) {
           companyBranchId: branchId,
           termsVersion,
           snapshotUrl: `/legal/terms_snapshots/${branchId}_${termsVersion}.json`,
+          termsTextHash,
           signedAt,
         },
       }),
     ]);
-
-    const crypto = await import("crypto");
-    const agreementBody = `RS BRIDGE TERMS OF BUSINESS v1.0 | Branch: ${branchId} | IP: ${clientIp} | Date: ${signedAt.toISOString()}`;
-    const termsTextHash = crypto.createHash("sha256").update(agreementBody).digest("hex");
 
     return NextResponse.json({
       message: "Terms of Business accepted successfully. Digital consent legally registered under IT Act §10A.",

@@ -78,7 +78,9 @@ export async function GET(req: Request) {
 
       const formattedApplications = applications.map((app) => {
         const isInterviewOrLater = ["InterviewScheduled", "Offered", "Joined"].includes(app.status);
-        const canUnmask = isInterviewOrLater && Boolean(contact.branch.termsAgreementSigned);
+        const isDriverReq = app.requirement?.categoryType === "Driver" || (app.candidate as any)?.preferredCategory === "Driver";
+        const driverAckValid = !isDriverReq || Boolean(app.driverLiabilityAckAt);
+        const canUnmask = isInterviewOrLater && Boolean(contact.branch.termsAgreementSigned) && driverAckValid;
         if (!canUnmask && app.candidate) {
           return {
             ...app,
@@ -414,29 +416,47 @@ export async function PATCH(req: Request) {
         });
 
         if (!application.requirement.isReplacement) {
-          const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+          const clientCity = (application.requirement.branch.city || "").toLowerCase();
+          const isIntraState = clientCity.includes("delhi") || clientCity.includes("ncr") || clientCity.includes("new delhi");
+          const taxType = isIntraState ? "CGST_SGST" : "IGST";
+          const cgstAmount = isIntraState ? (commissionAmount * 9) / 100 : null;
+          const sgstAmount = isIntraState ? (commissionAmount * 9) / 100 : null;
+          const igstAmount = !isIntraState ? (commissionAmount * 18) / 100 : null;
+          const taxAmount = (commissionAmount * 18) / 100;
+          const totalAmount = commissionAmount + taxAmount;
+
+          const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+          const invoiceNumber = `INV-${Date.now()}-${randomSuffix}`;
           const dueDate = new Date(placementDate);
           dueDate.setDate(dueDate.getDate() + paymentTermsDays);
+
+          const crypto = await import("crypto");
+          const irnRawStr = `${invoiceNumber}|07AAAAA0000A1Z5|${totalAmount.toFixed(2)}|${Date.now()}`;
+          const irnReference = crypto.createHash("sha256").update(irnRawStr).digest("hex");
 
           await db.invoice.create({
             data: {
               placementId: placement.id,
               invoiceNumber,
               subtotalAmount: commissionAmount,
-              taxAmount: 0,
-              totalAmount: commissionAmount,
+              taxType,
+              cgstAmount,
+              sgstAmount,
+              igstAmount,
+              taxAmount,
+              totalAmount,
               paymentTermsDaysApplied: paymentTermsDays,
               dueDate,
               status: "Draft",
             },
-          }).catch(console.error);
+          });
         }
 
         // Atomically increment vacanciesFilled
         await db.jobRequirement.update({
           where: { id: application.jobRequirementId },
           data: { vacanciesFilled: { increment: 1 } },
-        }).catch(console.error);
+        });
       }
     }
 

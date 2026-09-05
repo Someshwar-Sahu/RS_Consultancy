@@ -43,12 +43,20 @@ export async function uploadFile(
 
     try {
       const publicUrl = `${cleanEndpoint}/${b2Bucket}/${uniqueFilename}`;
+      const b2AuthToken = process.env.B2_AUTH_TOKEN || process.env.B2_ACC4_SECRET_KEY || process.env.S3_SECRET_ACCESS_KEY;
+      const headers: Record<string, string> = {
+        'Content-Type': mimeType,
+      };
+      if (b2AuthToken) {
+        headers['Authorization'] = b2AuthToken.startsWith('Bearer ') || b2AuthToken.startsWith('AWS') ? b2AuthToken : `Bearer ${b2AuthToken}`;
+      }
+      if (process.env.B2_ACC4_ACCESS_KEY || process.env.S3_ACCESS_KEY_ID) {
+        headers['x-amz-acl'] = 'public-read';
+      }
+
       const uploadRes = await fetch(publicUrl, {
         method: 'PUT',
-        headers: {
-          'Content-Type': mimeType,
-          ...(process.env.B2_ACC4_ACCESS_KEY || process.env.S3_ACCESS_KEY_ID ? { 'x-amz-acl': 'public-read' } : {}),
-        },
+        headers,
         body: new Uint8Array(buffer),
       });
 
