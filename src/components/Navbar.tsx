@@ -50,10 +50,9 @@ export function Navbar() {
               src="/logo.png"
               alt="RS Bridge Consultancy Logo"
               style={{
-                height: 38,
-                width: 38,
+                height: 42,
+                width: 42,
                 objectFit: "contain",
-                borderRadius: 6,
               }}
             />
             <span
