@@ -76,8 +76,35 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const jsonLdWebsite = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "RS Bridge Consultancy",
+    "alternateName": ["RS Bridge", "RS Consultancy", "RS Bridge Consultancy Staffing"],
+    "url": "https://rs-consultancy-seven.vercel.app",
+  };
+
+  const jsonLdOrg = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "RS Bridge Consultancy",
+    "url": "https://rs-consultancy-seven.vercel.app",
+    "logo": "https://rs-consultancy-seven.vercel.app/logo.png",
+    "description": "Pan-India manpower staffing, driver placement, corporate hiring, and recruitment consultancy.",
+  };
+
   return (
     <html lang="en">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdWebsite) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdOrg) }}
+        />
+      </head>
       <body className={inter.className}>
         <Providers>
           <Navbar />
