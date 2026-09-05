@@ -41,6 +41,9 @@ export const metadata: Metadata = {
     title: "RS Bridge Consultancy | Manpower & Staffing Solutions",
     description: "Pan-India hiring and corporate staffing agency platform.",
   },
+  verification: {
+    google: "_i52N7gyivCgZdThtL-J2cCp47rYsF9vH4bhwW8fU6o",
+  },
   robots: {
     index: true,
     follow: true,
