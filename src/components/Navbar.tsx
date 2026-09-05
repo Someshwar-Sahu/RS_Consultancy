@@ -46,19 +46,16 @@ export function Navbar() {
               gap: 8,
             }}
           >
-            <span
+            <img
+              src="/logo.png"
+              alt="RS Bridge Consultancy Logo"
               style={{
-                background: "#2563EB",
-                color: "#FFFFFF",
-                fontWeight: 900,
-                fontSize: 16,
-                padding: "6px 10px",
-                borderRadius: 8,
-                letterSpacing: 0.5,
+                height: 38,
+                width: 38,
+                objectFit: "contain",
+                borderRadius: 6,
               }}
-            >
-              RS
-            </span>
+            />
             <span
               style={{
                 fontWeight: 800,

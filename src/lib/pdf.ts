@@ -212,12 +212,13 @@ export function generateCandidateResumePdf(
   drawRect(LEFT_MARGIN, boxBottom, CONTENT_WIDTH, HEADER_HEIGHT, 0.95, 0.97, 0.99, true, true, 0.85, 0.88, 0.93, 0.75);
   drawRect(LEFT_MARGIN, boxBottom, 4, HEADER_HEIGHT, 0.08, 0.28, 0.65, true, false);
 
-  drawRect(LEFT_MARGIN + 10, boxBottom + 8, 86, 32, 1, 1, 1, true, true, 0.82, 0.85, 0.90, 0.75);
-  drawText("[ RS BRIDGE ]", LEFT_MARGIN + 16, boxBottom + 23, "/F1", 8.5, 0.08, 0.28, 0.65);
-  drawText("CONSULTANCY", LEFT_MARGIN + 18, boxBottom + 12, "/F1", 6.5, 0.38, 0.44, 0.52);
+  // Logo Badge Box (Emblem)
+  drawRect(LEFT_MARGIN + 10, boxBottom + 6, 88, 36, 0.06, 0.15, 0.35, true, true, 0.08, 0.28, 0.65, 0.75);
+  drawText("RS BRIDGE", LEFT_MARGIN + 16, boxBottom + 26, "/F1", 9.5, 1.0, 1.0, 1.0);
+  drawText("CONSULTANCY", LEFT_MARGIN + 18, boxBottom + 14, "/F1", 6.8, 0.22, 0.75, 0.98);
 
-  drawText("RS BRIDGE CONSULTANCY", LEFT_MARGIN + 106, boxBottom + 26, "/F1", 11, 0.08, 0.18, 0.36);
-  drawText("Executive Search & Strategic Staffing | Reg. NCR Sourcing Partner", LEFT_MARGIN + 106, boxBottom + 13, "/F2", 7.8, 0.35, 0.40, 0.48);
+  drawText("RS BRIDGE CONSULTANCY", LEFT_MARGIN + 108, boxBottom + 27, "/F1", 11.5, 0.06, 0.15, 0.35);
+  drawText("Executive Search & Strategic Staffing | Official Reg. Agency Partner", LEFT_MARGIN + 108, boxBottom + 13, "/F2", 7.8, 0.35, 0.40, 0.48);
 
   const refCode = generateCandidateRefCode(candidate);
   const categoryLabel = isDriver ? "Driver & Fleet" : (candidate.preferredCategory || "Corporate IT");

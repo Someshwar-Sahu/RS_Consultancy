@@ -35,11 +35,25 @@ export const metadata: Metadata = {
     siteName: "RS Bridge Consultancy",
     locale: "en_IN",
     type: "website",
+    images: [
+      {
+        url: "/logo.png",
+        width: 1200,
+        height: 1200,
+        alt: "RS Bridge Consultancy Logo",
+      },
+    ],
+  },
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/favicon.ico",
+    apple: "/logo.png",
   },
   twitter: {
     card: "summary_large_image",
     title: "RS Bridge Consultancy | Manpower & Staffing Solutions",
     description: "Pan-India hiring and corporate staffing agency platform.",
+    images: ["/logo.png"],
   },
   verification: {
     google: "_i52N7gyivCgZdThtL-J2cCp47rYsF9vH4bhwW8fU6o",
