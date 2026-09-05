@@ -31,40 +31,59 @@ export async function uploadFile(
   const uniqueFilename = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}${fileExtension}`;
   const mimeType = contentType || 'application/pdf';
 
-  // 1. PRIMARY: BACKBLAZE B2 OBJECT STORAGE DISPATCH (10 GB FREE TIER)
-  let rawEndpoint = process.env.B2_ACC4_ENDPOINT || process.env.BACKBLAZE_ENDPOINT || process.env.B2_ENDPOINT || process.env.S3_ENDPOINT || process.env.CLOUDFLARE_R2_ENDPOINT;
-  const b2Bucket = process.env.B2_ACC4_BUCKET || process.env.BACKBLAZE_BUCKET || process.env.B2_BUCKET || process.env.S3_BUCKET_NAME || process.env.CLOUDFLARE_R2_BUCKET;
+  // 1. PRIMARY: BACKBLAZE B2 NATIVE OBJECT STORAGE DISPATCH (10 GB FREE TIER)
+  const b2KeyId = process.env.B2_APPLICATION_KEY_ID || process.env.B2_KEY_ID || process.env.B2_ACC4_ACCESS_KEY || process.env.BACKBLAZE_KEY_ID;
+  const b2AppKey = process.env.B2_APPLICATION_KEY || process.env.B2_ACC4_SECRET_KEY || process.env.BACKBLAZE_APPLICATION_KEY;
+  const b2BucketId = process.env.B2_BUCKET_ID || process.env.BACKBLAZE_BUCKET_ID;
+  const b2BucketName = process.env.B2_ACC4_BUCKET || process.env.BACKBLAZE_BUCKET || process.env.B2_BUCKET || 'resumes';
 
-  if (rawEndpoint && b2Bucket) {
-    if (!rawEndpoint.startsWith('http://') && !rawEndpoint.startsWith('https://')) {
-      rawEndpoint = `https://${rawEndpoint}`;
-    }
-    const cleanEndpoint = rawEndpoint.replace(/\/$/, '');
-
+  if (b2KeyId && b2AppKey) {
     try {
-      const publicUrl = `${cleanEndpoint}/${b2Bucket}/${uniqueFilename}`;
-      const b2AuthToken = process.env.B2_AUTH_TOKEN || process.env.B2_ACC4_SECRET_KEY || process.env.S3_SECRET_ACCESS_KEY;
-      const headers: Record<string, string> = {
-        'Content-Type': mimeType,
-      };
-      if (b2AuthToken) {
-        headers['Authorization'] = b2AuthToken.startsWith('Bearer ') || b2AuthToken.startsWith('AWS') ? b2AuthToken : `Bearer ${b2AuthToken}`;
-      }
-      if (process.env.B2_ACC4_ACCESS_KEY || process.env.S3_ACCESS_KEY_ID) {
-        headers['x-amz-acl'] = 'public-read';
-      }
-
-      const uploadRes = await fetch(publicUrl, {
-        method: 'PUT',
-        headers,
-        body: new Uint8Array(buffer),
+      const basicAuth = `Basic ${Buffer.from(`${b2KeyId}:${b2AppKey}`).toString('base64')}`;
+      const authRes = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
+        headers: { Authorization: basicAuth },
       });
 
-      if (uploadRes.ok || uploadRes.status === 200 || uploadRes.status === 201) {
-        return publicUrl;
+      if (authRes.ok) {
+        const authData = await authRes.json();
+        const { apiUrl, authorizationToken, downloadUrl, allowed } = authData;
+        const targetBucketId = b2BucketId || (allowed ? allowed.bucketId : null);
+
+        if (targetBucketId) {
+          const uploadUrlRes = await fetch(`${apiUrl}/b2api/v2/b2_get_upload_url`, {
+            method: 'POST',
+            headers: {
+              Authorization: authorizationToken,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ bucketId: targetBucketId }),
+          });
+
+          if (uploadUrlRes.ok) {
+            const { uploadUrl, authorizationToken: uploadAuthToken } = await uploadUrlRes.json();
+            const crypto = await import('crypto');
+            const sha1Hash = crypto.createHash('sha1').update(buffer).digest('hex');
+
+            const uploadFileRes = await fetch(uploadUrl, {
+              method: 'POST',
+              headers: {
+                Authorization: uploadAuthToken,
+                'X-Bz-File-Name': encodeURIComponent(uniqueFilename),
+                'Content-Type': mimeType,
+                'Content-Length': buffer.length.toString(),
+                'X-Bz-Content-Sha1': sha1Hash,
+              },
+              body: new Uint8Array(buffer),
+            });
+
+            if (uploadFileRes.ok) {
+              return `${downloadUrl}/file/${b2BucketName}/${uniqueFilename}`;
+            }
+          }
+        }
       }
-    } catch (b2Err) {
-      console.error('Backblaze B2 Storage PUT exception:', b2Err);
+    } catch (b2NativeErr) {
+      console.error('Backblaze B2 Native Storage Exception:', b2NativeErr);
     }
   }
 

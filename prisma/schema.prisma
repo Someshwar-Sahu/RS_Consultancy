@@ -332,6 +332,7 @@ model Application {
   rejectionReason              String?           @map("rejection_reason")
   shareRejectionWithCandidate  Boolean           @default(false) @map("share_rejection_with_candidate")
   driverLiabilityAckAt         DateTime?         @map("driver_liability_ack_at")
+  proposedInterviewSlots       String?           @map("proposed_interview_slots")
   createdAt                    DateTime          @default(now()) @map("created_at")
   updatedAt                    DateTime          @updatedAt @map("updated_at")
 

@@ -278,6 +278,7 @@ export async function PATCH(req: Request) {
       agreedCtc,
       joiningDate,
       assessmentLink,
+      proposedInterviewSlots,
     } = body;
 
     if (driverLiabilityAck && applicationId) {
@@ -358,11 +359,16 @@ export async function PATCH(req: Request) {
       notifMessage = `Congratulations! Your placement at ${application.requirement.branch.company.name} as ${application.requirement.title} is confirmed.`;
     }
 
+    const slotsJsonStr = proposedInterviewSlots ? (typeof proposedInterviewSlots === "string" ? proposedInterviewSlots : JSON.stringify(proposedInterviewSlots)) : undefined;
+
     // Update status and record history
     const [updated] = await db.$transaction([
       db.application.update({
         where: { id: applicationId },
-        data: { status },
+        data: {
+          status,
+          ...(slotsJsonStr ? { proposedInterviewSlots: slotsJsonStr } : {}),
+        },
       }),
       db.applicationStatusHistory.create({
         data: {
