@@ -331,6 +331,7 @@ model Application {
   status                       ApplicationStatus @default(Applied)
   rejectionReason              String?           @map("rejection_reason")
   shareRejectionWithCandidate  Boolean           @default(false) @map("share_rejection_with_candidate")
+  driverLiabilityAckAt         DateTime?         @map("driver_liability_ack_at")
   createdAt                    DateTime          @default(now()) @map("created_at")
   updatedAt                    DateTime          @updatedAt @map("updated_at")
 
@@ -472,4 +473,18 @@ model VerificationOtp {
 
   @@index([email, otpCode])
   @@map("verification_otps")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  details   String?
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, action])
+  @@map("audit_logs")
 }

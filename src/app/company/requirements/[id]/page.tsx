@@ -8,6 +8,12 @@ interface Application {
   status: string;
   assignedUserId: string | null;
   createdAt: string;
+  driverLiabilityAckAt?: string | null;
+  requirement?: {
+    id: string;
+    title: string;
+    category?: string;
+  };
   candidate: {
     id: string;
     fullName: string;
@@ -38,6 +44,7 @@ export default function RequirementApplicantsPage({ params }: { params: Promise<
   const { id: requirementId } = use(params);
   const [applications, setApplications] = useState<Application[]>([]);
   const [requirementTitle, setRequirementTitle] = useState("Applicant Pipeline");
+  const [reqCategory, setReqCategory] = useState("");
   const [loading, setLoading] = useState(true);
   const [termsStatus, setTermsStatus] = useState<TermsStatus | null>(null);
   const [termsModalOpen, setTermsModalOpen] = useState(false);
@@ -92,8 +99,9 @@ export default function RequirementApplicantsPage({ params }: { params: Promise<
       if (appData.applications) {
         const filtered = appData.applications.filter((a: any) => a.jobRequirementId === requirementId);
         setApplications(filtered);
-        if (filtered.length > 0 && filtered[0].requirement?.title) {
-          setRequirementTitle(filtered[0].requirement.title);
+        if (filtered.length > 0) {
+          if (filtered[0].requirement?.title) setRequirementTitle(filtered[0].requirement.title);
+          if (filtered[0].requirement?.category) setReqCategory(filtered[0].requirement.category);
         }
       }
 
@@ -486,7 +494,9 @@ export default function RequirementApplicantsPage({ params }: { params: Promise<
         <div style={{ display: "grid", gap: 16 }}>
           {filtered.map((app) => {
             const isInterviewOrLater = ["InterviewScheduled", "Offered", "Joined"].includes(app.status);
-            const canSeeContact = isInterviewOrLater && termsStatus?.termsAgreementSigned;
+            const isDriverReq = reqCategory === "Driver" || app.requirement?.category === "Driver";
+            const driverAckValid = !isDriverReq || Boolean(app.driverLiabilityAckAt);
+            const canSeeContact = isInterviewOrLater && Boolean(termsStatus?.termsAgreementSigned) && driverAckValid;
             const isCurated = app.status === "Shortlisted" || !!app.assignedUserId;
 
             return (
@@ -571,6 +581,28 @@ export default function RequirementApplicantsPage({ params }: { params: Promise<
                   {app.history && app.history[0]?.notes && (
                     <div style={{ background: "#F8FAFC", borderLeft: "3px solid #2563EB", padding: "8px 12px", borderRadius: "0 6px 6px 0", fontSize: 12, color: "#334155", marginBottom: 10 }}>
                       <strong>Latest Update:</strong> {app.history[0].notes}
+                    </div>
+                  )}
+
+                  {/* Driver Zero-Liability Gate under Motor Vehicles Act 1988 */}
+                  {isDriverReq && !app.driverLiabilityAckAt && isInterviewOrLater && (
+                    <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", padding: "8px 12px", borderRadius: 6, fontSize: 12, color: "#991B1B", marginBottom: 10 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 700 }}>
+                        <input
+                          type="checkbox"
+                          onChange={async (e) => {
+                            if (e.target.checked) {
+                              await fetch("/api/applications", {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ applicationId: app.id, driverLiabilityAck: true }),
+                              });
+                              loadData();
+                            }
+                          }}
+                        />
+                        ⚖️ I acknowledge zero agency liability for driver conduct under Motor Vehicles Act 1988
+                      </label>
                     </div>
                   )}
 

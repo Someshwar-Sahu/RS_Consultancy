@@ -45,6 +45,7 @@ export async function GET(req: Request) {
     if (userRole === "COMPANY_CONTACT") {
       const contact = await db.companyContact.findFirst({
         where: { userId },
+        include: { branch: true },
       });
       if (!contact) {
         return NextResponse.json({ error: "No company contact profile found." }, { status: 403 });
@@ -75,7 +76,23 @@ export async function GET(req: Request) {
         orderBy: { createdAt: "desc" },
       });
 
-      return NextResponse.json({ applications });
+      const formattedApplications = applications.map((app) => {
+        const isInterviewOrLater = ["InterviewScheduled", "Offered", "Joined"].includes(app.status);
+        const canUnmask = isInterviewOrLater && Boolean(contact.branch.termsAgreementSigned);
+        if (!canUnmask && app.candidate) {
+          return {
+            ...app,
+            candidate: {
+              ...app.candidate,
+              email: app.candidate.email ? `${app.candidate.email[0]}***@${app.candidate.email.split("@")[1] || "domain.com"}` : null,
+              mobile: app.candidate.mobile ? `${app.candidate.mobile.slice(0, 3)}*****${app.candidate.mobile.slice(-3)}` : null,
+            },
+          };
+        }
+        return app;
+      });
+
+      return NextResponse.json({ applications: formattedApplications });
     }
 
     // ADMIN or EMPLOYEE
@@ -244,9 +261,11 @@ export async function PATCH(req: Request) {
 
     const userRole = (session.user as any).role;
     const userId = session.user.id;
+    const body = await req.json();
     const {
       applicationId,
       status,
+      driverLiabilityAck,
       notes,
       interviewDate,
       interviewTime,
@@ -257,7 +276,18 @@ export async function PATCH(req: Request) {
       agreedCtc,
       joiningDate,
       assessmentLink,
-    } = await req.json();
+    } = body;
+
+    if (driverLiabilityAck && applicationId) {
+      const updatedApp = await db.application.update({
+        where: { id: applicationId },
+        data: { driverLiabilityAckAt: new Date() },
+      });
+      return NextResponse.json({
+        message: "Driver zero-liability acknowledgment recorded under Motor Vehicles Act 1988.",
+        application: updatedApp,
+      });
+    }
 
     if (!applicationId || !status) {
       return NextResponse.json({ error: "Application ID and new status are required." }, { status: 400 });

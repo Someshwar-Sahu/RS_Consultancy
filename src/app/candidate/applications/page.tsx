@@ -27,6 +27,9 @@ export default function CandidateApplicationsPage() {
   // Decline Modal
   const [declineApp, setDeclineApp] = useState<{ id: string; type: "interview" | "offer"; title: string } | null>(null);
   const [declineReason, setDeclineReason] = useState("");
+  const [slot1, setSlot1] = useState("");
+  const [slot2, setSlot2] = useState("");
+  const [slot3, setSlot3] = useState("");
   const [declining, setDeclining] = useState(false);
 
   useEffect(() => {
@@ -94,9 +97,12 @@ export default function CandidateApplicationsPage() {
 
     setDeclining(true);
     try {
+      const slotsList = [slot1, slot2, slot3].filter(Boolean);
+      const slotsFormatted = slotsList.length > 0 ? ` [Proposed Reschedule Slots: ${slotsList.map((s, i) => `Slot ${i + 1}: ${new Date(s).toLocaleString()}`).join(" | ")}]` : "";
+
       const noteText =
         declineApp.type === "interview"
-          ? `Candidate declined interview / requested reschedule: ${declineReason}`
+          ? `Candidate declined interview / requested reschedule: ${declineReason}${slotsFormatted}`
           : `Candidate declined job offer: ${declineReason}`;
 
       const res = await fetch("/api/applications", {
@@ -449,6 +455,19 @@ export default function CandidateApplicationsPage() {
             </p>
 
             <form onSubmit={handleDeclineSubmit}>
+              {declineApp.type === "interview" && (
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                    📅 Propose 3 Alternative Time Slots for Rescheduling:
+                  </label>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <input type="datetime-local" value={slot1} onChange={(e) => setSlot1(e.target.value)} style={{ padding: "6px 10px", border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 12, width: "100%" }} />
+                    <input type="datetime-local" value={slot2} onChange={(e) => setSlot2(e.target.value)} style={{ padding: "6px 10px", border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 12, width: "100%" }} />
+                    <input type="datetime-local" value={slot3} onChange={(e) => setSlot3(e.target.value)} style={{ padding: "6px 10px", border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 12, width: "100%" }} />
+                  </div>
+                </div>
+              )}
+
               <textarea
                 required
                 rows={3}
@@ -456,7 +475,7 @@ export default function CandidateApplicationsPage() {
                 onChange={(e) => setDeclineReason(e.target.value)}
                 placeholder={
                   declineApp.type === "interview"
-                    ? "e.g. Unavailable at this time slot, requesting reschedule to Friday 3 PM / Accepted another position."
+                    ? "e.g. Unavailable at this time slot, requesting reschedule to proposed slots."
                     : "e.g. Offered CTC is below current expectation / Location constraints / Accepted competing offer."
                 }
                 style={{ width: "100%", padding: "10px 12px", border: "1px solid #CBD5E1", borderRadius: 6, fontSize: 13, marginBottom: 16 }}

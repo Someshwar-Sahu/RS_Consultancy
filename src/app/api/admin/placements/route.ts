@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     const computedCommission = (ctcNum * rateNum) / 100;
     const commissionAmount = Math.max(computedCommission, MIN_PLACEMENT_FLOOR);
 
-    const { sourcingUserId, signOnBonusIncluded, noticeBuyoutIncluded } = body;
+    const { sourcingUserId, accountManagerUserId, signOnBonusIncluded, noticeBuyoutIncluded } = body;
 
     // Create Placement inside a transaction
     const placement = await db.$transaction(async (tx) => {
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         data: { status: "Joined" },
       });
 
-      // 2. Create Placement Record
+      // 2. Create Placement Record with split commission assignment
       const newPlacement = await tx.placement.create({
         data: {
           applicationId,
@@ -65,6 +65,7 @@ export async function POST(req: Request) {
           isActive: true,
           replacesPlacementId: replacesPlacementId || null,
           sourcingUserId: sourcingUserId || null,
+          accountManagerUserId: accountManagerUserId || null,
           signOnBonusIncluded: Boolean(signOnBonusIncluded),
           noticeBuyoutIncluded: Boolean(noticeBuyoutIncluded),
         },
